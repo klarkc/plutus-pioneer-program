@@ -1,7 +1,7 @@
-module Week03.Converter ( posixTimeToSlotTestnetConverter ) where 
+module Week03.Converter ( posixTimeToSlotTestnetConverter, testnetSlotToEndPOSIXTime ) where 
 
 import Ledger          ( POSIXTime(POSIXTime), Slot(Slot) )
-import Ledger.TimeSlot ( SlotConfig(SlotConfig), posixTimeToEnclosingSlot )
+import Ledger.TimeSlot ( SlotConfig(SlotConfig), posixTimeToEnclosingSlot, slotToEndPOSIXTime )
 
 posixTimeToSlotTestnetConverter :: POSIXTime -> Slot
 posixTimeToSlotTestnetConverter time = slotWhenSlotChangedTo1Sec + posixTimeToEnclosingSlot testnetConf time
@@ -14,3 +14,6 @@ slotWhenSlotChangedTo1Sec = Slot 1598400
 
 testnetConf :: SlotConfig
 testnetConf = SlotConfig 1000 timeWhenSlotChangedTo1Sec
+
+testnetSlotToEndPOSIXTime :: Slot -> POSIXTime
+testnetSlotToEndPOSIXTime = slotToEndPOSIXTime testnetConf 
