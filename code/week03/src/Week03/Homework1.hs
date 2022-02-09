@@ -112,6 +112,8 @@ grab = do
     pkh    <- ownPaymentPubKeyHash
     utxos  <- utxosAt scrAddress
     let utxos1 = Map.filter (isSuitable $ \dat -> beneficiary1 dat == pkh && now <= deadline dat) utxos
+        -- for the simulation at slot 6 where wallet 1 and 2 gives (at slot 5 and 10 respectively), the next filter is
+        -- returning an unexpected wallet 1 to wallet 2 utxo where it should not, because the deadline as not been reached
         utxos2 = Map.filter (isSuitable $ \dat -> beneficiary2 dat == pkh && now >  deadline dat) utxos
     logInfo @P.String $ printf "found %d gift(s) to grab" (Map.size utxos1 P.+ Map.size utxos2)
     unless (Map.null utxos1) $ do
