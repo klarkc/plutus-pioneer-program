@@ -37,7 +37,17 @@ import           Text.Printf          (printf)
 
 {-# INLINABLE mkValidator #-}
 mkValidator :: PaymentPubKeyHash -> POSIXTime -> () -> ScriptContext -> Bool
-mkValidator _ _ _ _ = False -- FIX ME!
+mkValidator pkh deadline () ctx = traceIfFalse "beneficiary's signature missing" signedByBeneficiary &&
+                                  traceIfFalse "deadline not reached" deadlineReached
+                                  where
+                                    info :: TxInfo
+                                    info = scriptContextTxInfo ctx
+
+                                    signedByBeneficiary :: Bool
+                                    signedByBeneficiary = txSignedBy info $ unPaymentPubKeyHash pkh
+
+                                    deadlineReached :: Bool
+                                    deadlineReached = contains (from $ deadline) $ txInfoValidRange info
 
 data Vesting
 instance Scripts.ValidatorTypes Vesting where
@@ -45,13 +55,15 @@ instance Scripts.ValidatorTypes Vesting where
     type instance RedeemerType Vesting = ()
 
 typedValidator :: PaymentPubKeyHash -> Scripts.TypedValidator Vesting
-typedValidator = undefined -- IMPLEMENT ME!
+typedValidator pkh = Scripts.mkTypedValidator @Vesting
+                     ($$(PlutusTx.compile [|| mkValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode pkh)
+                     $$(PlutusTx.compile [|| Scripts.wrapValidator @POSIXTime @() ||])
 
 validator :: PaymentPubKeyHash -> Validator
-validator = undefined -- IMPLEMENT ME!
+validator pkh = Scripts.validatorScript ( typedValidator pkh )
 
 scrAddress :: PaymentPubKeyHash -> Ledger.Address
-scrAddress = undefined -- IMPLEMENT ME!
+scrAddress = scriptAddress . validator
 
 data GiveParams = GiveParams
     { gpBeneficiary :: !PaymentPubKeyHash
