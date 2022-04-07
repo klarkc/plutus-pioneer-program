@@ -23,6 +23,7 @@ import           Plutus.Contract            as Contract
 import           Plutus.Trace.Emulator      as Emulator
 import qualified PlutusTx
 import           PlutusTx.Prelude           hiding (Semigroup(..), unless)
+import           PlutusTx.Trace             (trace)
 import           Ledger                     hiding (mint, singleton)
 import           Ledger.Constraints         as Constraints
 import           Ledger.TimeSlot
@@ -39,13 +40,22 @@ import           Wallet.Emulator.Wallet
 -- This policy should only allow minting (or burning) of tokens if the owner of the specified PaymentPubKeyHash
 -- has signed the transaction and if the specified deadline has not passed.
 mkPolicy :: PaymentPubKeyHash -> POSIXTime -> () -> ScriptContext -> Bool
-mkPolicy pkh deadline () ctx = True -- FIX ME!
+mkPolicy pkh deadline () ctx = traceIfFalse "Unexpected pubkey hash" expectedPKH &&
+                               traceIfFalse "Invalid deadline" validDeadline where
+                                   info = scriptContextTxInfo ctx
+                                   expectedPKH = txSignedBy info $ unPaymentPubKeyHash pkh
+                                   validDeadline = after deadline $ txInfoValidRange info
 
 policy :: PaymentPubKeyHash -> POSIXTime -> Scripts.MintingPolicy
-policy pkh deadline = undefined -- IMPLEMENT ME!
+policy pkh deadline = mkMintingPolicyScript $
+    $$(PlutusTx.compile [|| \p d -> Scripts.wrapMintingPolicy $ mkPolicy p d ||])
+    `PlutusTx.applyCode`
+    PlutusTx.liftCode pkh
+    `PlutusTx.applyCode`
+    PlutusTx.liftCode deadline
 
 curSymbol :: PaymentPubKeyHash -> POSIXTime -> CurrencySymbol
-curSymbol pkh deadline = undefined -- IMPLEMENT ME!
+curSymbol pkh deadline = scriptCurrencySymbol $ policy pkh deadline
 
 data MintParams = MintParams
     { mpTokenName :: !TokenName
