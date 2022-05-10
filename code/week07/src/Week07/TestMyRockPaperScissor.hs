@@ -8,10 +8,9 @@
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 
-module Week07.TestStateMachine
+module Week07.TestMyRockPaperScissor
     ( test
     , test'
-    , myTrace
     , GameChoice (..)
     ) where
 
@@ -24,14 +23,22 @@ import           PlutusTx.Prelude
 import           Prelude                    (IO, Show (..))
 import           Wallet.Emulator.Wallet
 
-import           Week07.StateMachine
+import           Week07.MyRockPaperScissor
 
 test :: IO ()
 test = do
-    test' Zero Zero
-    test' Zero One
-    test' One Zero
-    test' One One
+    -- P1 wins
+    test' Paper Rock
+    test' Rock Scissors
+    test' Scissors Paper
+    -- P2 wins
+    test' Rock Paper
+    test' Scissors Rock
+    test' Paper Scissors
+    -- Draw
+    test' Rock Rock
+    test' Paper Paper
+    test' Scissors Scissors
 
 test' :: GameChoice -> GameChoice -> IO ()
 test' c1 c2 = runEmulatorTraceIO $ myTrace c1 c2

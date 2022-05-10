@@ -16,6 +16,8 @@ library
                      , Week07.TestEvenOdd
                      , Week07.TestRockPaperScissors
                      , Week07.TestStateMachine
+                     , Week07.MyRockPaperScissor
+                     , Week07.TestMyRockPaperScissor
   build-depends:       aeson
                      , base ^>=4.14.1.0
                      , containers
