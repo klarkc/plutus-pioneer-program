@@ -56,6 +56,7 @@ data TSRedeemer =
     | AddTokens Integer
     | BuyTokens Integer
     | Withdraw Integer Integer
+    | Close
     deriving (Show, Prelude.Eq)
 
 PlutusTx.unstableMakeIsData ''TSRedeemer
@@ -72,24 +73,30 @@ transition ts s r = case (stateValue s, stateData s, r) of
                                                                       )
     (v, p, AddTokens n)  | n > 0                              -> Just ( mempty
                                                                       , State p $
-                                                                        v                                       <>
-                                                                        assetClassValue (tsToken ts) n
+                                                                          v                                       <>
+                                                                          assetClassValue (tsToken ts) n
                                                                       )
     (v, p, BuyTokens n)  | n > 0                              -> Just ( mempty
                                                                       , State p $
-                                                                        v                                       <>
-                                                                        assetClassValue (tsToken ts) (negate n) <>
-                                                                        lovelaceValueOf (n * p)
+                                                                          v                                       <>
+                                                                          assetClassValue (tsToken ts) (negate n) <>
+                                                                          lovelaceValueOf (n * p)
                                                                       )
     (v, p, Withdraw n l) | n >= 0 && l >= 0 &&
                            v `geq` (w <> toValue minAdaTxOut) -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
                                                                       , State p $
-                                                                        v                                       <>
-                                                                        negate w
+                                                                          v                                       <>
+                                                                          negate w
                                                                       )
       where
         w = assetClassValue (tsToken ts) n <>
             lovelaceValueOf l
+    (v, p, Close)                                             -> Just ( mempty
+                                                                      , State p $ foldMap spendValue $ flattenValue v
+                                                                      )
+      where
+          spendValue :: (CurrencySymbol, TokenName, Integer) -> Value
+          spendValue (c, t, _) = singleton c t 0
     _                                                         -> Nothing
 
 {-# INLINABLE tsStateMachine #-}
@@ -150,6 +157,9 @@ buyTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ BuyTokens n
 withdraw :: TokenSale -> Integer -> Integer -> Contract w s Text ()
 withdraw ts n l = void $ mapErrorSM $ runStep (tsClient ts) $ Withdraw n l
 
+close :: TokenSale -> () -> Contract w s Text ()
+close ts _ = void $ mapErrorSM $ runStep (tsClient ts) $ Close
+
 type TSStartSchema =
         Endpoint "start"      (CurrencySymbol, TokenName)
 type TSUseSchema =
@@ -157,6 +167,7 @@ type TSUseSchema =
     .\/ Endpoint "add tokens" Integer
     .\/ Endpoint "buy tokens" Integer
     .\/ Endpoint "withdraw"   (Integer, Integer)
+    .\/ Endpoint "close"      ()
 
 startEndpoint :: Contract (Last TokenSale) TSStartSchema Text ()
 startEndpoint = forever
@@ -164,22 +175,24 @@ startEndpoint = forever
               $ awaitPromise
               $ endpoint @"start" $ startTS . AssetClass
 
-useEndpoints' :: ( HasEndpoint "set price" Integer s
-                 , HasEndpoint "add tokens" Integer s
-                 , HasEndpoint "buy tokens" Integer s
-                 , HasEndpoint "withdraw" (Integer, Integer) s
+useEndpoints' :: ( HasEndpoint "set price"  Integer            s
+                 , HasEndpoint "add tokens" Integer            s
+                 , HasEndpoint "buy tokens" Integer            s
+                 , HasEndpoint "withdraw"   (Integer, Integer) s
+                 , HasEndpoint "close"      ()                 s
                  )
               => TokenSale
               -> Contract () s Text ()
 useEndpoints' ts = forever
                 $ handleError logError
                 $ awaitPromise
-                $ setPrice' `select` addTokens' `select` buyTokens' `select` withdraw'
+                $ setPrice' `select` addTokens' `select` buyTokens' `select` withdraw' `select` close'
   where
     setPrice'  = endpoint @"set price"  $ setPrice ts
     addTokens' = endpoint @"add tokens" $ addTokens ts
     buyTokens' = endpoint @"buy tokens" $ buyTokens ts
     withdraw'  = endpoint @"withdraw"   $ Prelude.uncurry $ withdraw ts
+    close'     = endpoint @"close"      $ close ts
 
 useEndpoints :: TokenSale -> Contract () TSUseSchema Text ()
 useEndpoints = useEndpoints'

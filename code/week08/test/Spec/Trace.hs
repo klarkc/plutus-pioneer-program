@@ -33,7 +33,7 @@ import           Test.Tasty
 import qualified Test.Tasty.HUnit                             as HUnit
 
 import           Plutus.Contract.Test.Coverage.ReportCoverage (writeCoverageReport)
-import           Week08.TokenSale
+import           Week08.TokenSaleFixed
 
 tests :: TestTree
 tests = checkPredicateOptions
@@ -63,7 +63,7 @@ myOptions = defaultCheckOptions & emulatorConfig .~ emCfg
 
 myPredicate :: TracePredicate
 myPredicate =
-    walletFundsChange w1 (Ada.lovelaceValueOf   10_000_000  <> assetClassValue token (-60) <> Plutus.negate (toValue minAdaTxOut)) .&&.
+    walletFundsChange w1 (Ada.lovelaceValueOf   25_000_000  <> assetClassValue token (-25) <> Plutus.negate (toValue minAdaTxOut)) .&&.
     walletFundsChange w2 (Ada.lovelaceValueOf (-20_000_000) <> assetClassValue token   20)                                         .&&.
     walletFundsChange w3 (Ada.lovelaceValueOf (- 5_000_000) <> assetClassValue token    5)
 
@@ -113,6 +113,9 @@ myTrace = do
             void $ Emulator.waitNSlots 5
 
             callEndpoint @"withdraw" h1 (40, 10_000_000)
+            void $ Emulator.waitNSlots 5
+
+            callEndpoint @"close" h1 ()
             void $ Emulator.waitNSlots 5
 
 checkPredicateOptionsCoverage :: CheckOptions
